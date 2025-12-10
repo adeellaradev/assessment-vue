@@ -17,7 +17,8 @@
               type="email"
               autocomplete="email"
               required
-              class="relative px-2 block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-100 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              :disabled="loading"
+              class="relative px-2 block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-100 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 disabled:opacity-50"
               placeholder="Email address">
           </div>
           <div>
@@ -29,7 +30,8 @@
               type="password"
               autocomplete="current-password"
               required
-              class="relative px-2 block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-100 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              :disabled="loading"
+              class="relative px-2 block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-100 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 disabled:opacity-50"
               placeholder="Password">
           </div>
         </div>
@@ -47,7 +49,12 @@
         </div>
 
         <div>
-          <button type="submit" class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Sign in</button>
+          <button
+            type="submit"
+            :disabled="loading"
+            class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ loading ? 'Signing in...' : 'Sign in' }}
+          </button>
         </div>
       </form>
 
@@ -61,15 +68,20 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
 const email = ref('')
 const password = ref('')
 const rememberMe = ref(false)
 
-const handleSubmit = () => {
-  // Handle login logic here
-  console.log('Login submitted', { email: email.value, password: password.value, rememberMe: rememberMe.value })
-  // You can add your authentication logic here
+const { login, loading } = useAuth()
+
+const handleSubmit = async () => {
+  try {
+    await login(email.value, password.value)
+    router.push('/dashboard')
+  } catch (err) {
+  }
 }
 </script>
