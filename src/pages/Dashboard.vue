@@ -1,73 +1,35 @@
 <template>
   <div class="min-h-screen bg-gray-100">
     <!-- Navigation Bar -->
-    <Navbar title="Dashboard" :user-name="userName" />
+    <Navbar title="Trading Dashboard" :user-name="userName" />
 
     <!-- Main Content -->
-    <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div class="mb-8">
-        <h2 class="text-2xl font-bold text-gray-900">Welcome, {{ userName }}!</h2>
-        <p class="mt-2 text-sm text-gray-600">You have successfully logged in.</p>
-      </div>
+    <main class="mx-auto max-w-[1920px] px-4 py-6 sm:px-6 lg:px-8">
+    
+      <!-- Main Grid Layout -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <!-- Left Column: Order Form + Wallet -->
+        <div class="space-y-6 lg:col-span-3">
+          <!-- Limit Order Form -->
+          <LimitOrderForm @submit="handlePlaceOrder" />
 
-      <!-- Dashboard Cards -->
-      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="overflow-hidden rounded-lg bg-white shadow">
-          <div class="p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <svg class="h-8 w-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <div class="ml-4">
-                <h3 class="text-sm font-medium text-gray-500">Account</h3>
-                <p class="text-lg font-semibold text-gray-900">{{ userEmail }}</p>
-              </div>
-            </div>
-          </div>
+          <!-- Wallet Balance -->
+          <WalletBalance
+            :balances="balances"
+            :btc-price="btcPrice"
+            :eth-price="ethPrice" />
         </div>
 
-        <div class="overflow-hidden rounded-lg bg-white shadow">
-          <div class="p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div class="ml-4">
-                <h3 class="text-sm font-medium text-gray-500">Status</h3>
-                <p class="text-lg font-semibold text-gray-900">Active</p>
-              </div>
-            </div>
-          </div>
+        <!-- Middle Column: Orders List -->
+        <div class="lg:col-span-6">
+          <OrdersList :orders="orders" @cancel="handleCancelOrder" />
         </div>
 
-        <div class="overflow-hidden rounded-lg bg-white shadow">
-          <div class="p-6">
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <svg class="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div class="ml-4">
-                <h3 class="text-sm font-medium text-gray-500">Last Login</h3>
-                <p class="text-lg font-semibold text-gray-900">Just now</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Welcome Message -->
-      <div class="mt-8 overflow-hidden rounded-lg bg-white shadow">
-        <div class="p-6">
-          <h3 class="text-lg font-medium text-gray-900">Getting Started</h3>
-          <p class="mt-2 text-sm text-gray-600">
-            Welcome to your dashboard! This is where you can manage your account and access various features.
-          </p>
+        <!-- Right Column: Orderbook -->
+        <div class="lg:col-span-3">
+          <Orderbook
+            :orderbook="orderbook"
+            :last-price="lastPrice" />
         </div>
       </div>
     </main>
@@ -75,18 +37,81 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useProfile } from '../composables/useProfile'
+import { useOrders } from '../composables/useOrders'
+import { useOrderbook } from '../composables/useOrderbook'
+import { useRealtime } from '../composables/useRealtime'
 import Navbar from '../components/Navbar.vue'
+import LimitOrderForm from '../components/LimitOrderForm.vue'
+import WalletBalance from '../components/WalletBalance.vue'
+import OrdersList from '../components/OrdersList.vue'
+import Orderbook from '../components/Orderbook.vue'
 
 const router = useRouter()
-const userName = ref('')
-const userEmail = ref('')
+const { initAuth } = useAuth()
 
-const { initAuth, user } = useAuth()
+// Composables
+const { userName, userId, balances, fetchProfile } = useProfile()
+const { orders, placeOrder, cancelOrder, fetchOrders } = useOrders()
+const { orderbook, btcPrice, ethPrice, lastPrice, fetchOrderbook, fetchAllOrderbooks } = useOrderbook()
+const { setupRealtimeListener } = useRealtime()
 
-onMounted(() => {
+// Handle placing a new order
+const handlePlaceOrder = async (orderData) => {
+  const result = await placeOrder(orderData, balances.value)
+
+  if (result) {
+    // Refresh data after successful order placement
+    await Promise.all([
+      fetchProfile(),
+      fetchOrders(),
+      fetchOrderbook(orderData.symbol)
+    ])
+  }
+}
+
+// Handle cancelling an order
+const handleCancelOrder = async (orderId) => {
+  await cancelOrder(orderId)
+
+  // Refresh data after cancellation
+  await Promise.all([
+    fetchProfile(),
+    fetchOrders()
+  ])
+}
+
+// Handle real-time trade matched event
+const handleTradeMatched = async (event) => {
+  const trade = event.trade
+
+  // Refresh all data
+  await Promise.all([
+    fetchProfile(),
+    fetchOrders(),
+    fetchOrderbook(trade.symbol)
+  ])
+}
+
+// Handle real-time order status update
+const handleOrderStatusUpdated = async (event) => {
+  const order = event.order
+
+  // Refresh all data when order status changes
+  await Promise.all([
+    fetchProfile(),
+    fetchOrders(),
+    fetchOrderbook(order.symbol)
+  ])
+}
+
+// Store cleanup function
+let cleanupRealtime = null
+
+onMounted(async () => {
   initAuth()
 
   const token = localStorage.getItem('authToken')
@@ -95,16 +120,20 @@ onMounted(() => {
     return
   }
 
-  if (user.value) {
-    userName.value = user.value.name
-    userEmail.value = user.value.email
-  } else {
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      const userData = JSON.parse(storedUser)
-      userName.value = userData.name
-      userEmail.value = userData.email
-    }
+  // Fetch initial data
+  await fetchProfile()
+  await fetchOrders()
+  await fetchAllOrderbooks()
+
+  // Setup real-time updates for both trade matching and order status updates
+  if (userId.value) {
+    cleanupRealtime = setupRealtimeListener(userId.value, handleTradeMatched, handleOrderStatusUpdated)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (cleanupRealtime) {
+    cleanupRealtime()
   }
 })
 </script>

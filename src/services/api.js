@@ -36,30 +36,63 @@ async function apiRequest(endpoint, options = {}) {
 
     return data
   } catch (error) {
-    console.error('API Error:', error)
     throw error
   }
 }
 
 
 export const authAPI = {
-  
+
   login: (email, password) =>
     apiRequest('/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
 
- 
+
   logout: () =>
     apiRequest('/logout', {
       method: 'POST',
     }),
 
-  
+
   getProfile: () => apiRequest('/profile'),
+}
+
+// Profile & Balance API
+export const profileAPI = {
+  getProfile: () => apiRequest('/profile'),
+}
+
+// Orders API
+export const ordersAPI = {
+  getOrders: () => apiRequest('/orders'),
+
+  placeOrder: (orderData) =>
+    apiRequest('/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        symbol: orderData.symbol,
+        side: orderData.side.toLowerCase(),
+        price: orderData.price.toString(),
+        amount: orderData.amount.toString(),
+      }),
+    }),
+
+  cancelOrder: (orderId) =>
+    apiRequest(`/orders/${orderId}/cancel`, {
+      method: 'POST',
+    }),
+}
+
+// Orderbook API
+export const orderbookAPI = {
+  getOrderbook: (symbol) => apiRequest(`/orderbook?symbol=${symbol}`),
 }
 
 export default {
   authAPI,
+  profileAPI,
+  ordersAPI,
+  orderbookAPI,
 }
